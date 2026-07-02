@@ -1,0 +1,1 @@
+import 'dotenv-cli/config';
