@@ -567,21 +567,6 @@ erDiagram
 
 ---
 
-## TDD Workflow
-
-```
-1. Mentor buat test   → test define contract (apa yang HARUS terjadi)
-2. Mentor buat stub   → stub return empty/default (ga ada logic)
-3. Intern implement   → isi stub sampai tests PASS
-```
-
-**Rules:**
-- Tests = source of truth. Kalau test bilang `expect(result.email).toBe('test@test.com')`, implementasi HARUS return email itu.
-- Stubs sekarang return `''`, `null`, `0`, `false`, `[]`, `void`. Intern WAJIB ganti dengan real logic.
-- Jangan ubah test kecuali mentor suruh.
-
----
-
 ## Implementation Checklist
 
 ### 1. PrismaService (`src/prisma/prisma.service.ts`)
@@ -661,7 +646,7 @@ pnpm run db:generate
 
 ### 8. Swagger/OpenAPI
 
-Install `@nestjs/swagger` + add decorators ke controllers dan DTOs.
+Install `@nestjs/swagger` + add decorators to controllers and DTOs.
 
 ```bash
 pnpm add @nestjs/swagger
@@ -669,7 +654,7 @@ pnpm add @nestjs/swagger
 
 ### 9. AppModule (`src/app.module.ts`)
 
-Import semua feature modules + register global filter + interceptor.
+Import all feature modules + register global filter + interceptor.
 
 ### 10. Main.ts (`src/main.ts`)
 
@@ -677,11 +662,11 @@ Add helmet, cors, cookie-parser, rate-limit, swagger setup.
 
 ### 11. Docker
 
-Multi-stage Dockerfile + update docker-compose.yml dengan app service.
+Multi-stage Dockerfile + update docker-compose.yml with app service.
 
 ### 12. BullMQ Worker (In-App)
 
-Create `src/modules/analytics/analytics.processor.ts` sebagai BullMQ processor. Register di `analytics.module.ts`.
+Create `src/modules/analytics/analytics.processor.ts` as BullMQ processor. Register in `analytics.module.ts`.
 
 ### 13. CI/CD
 
