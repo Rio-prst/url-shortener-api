@@ -9,19 +9,36 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse as SwaggerApiResponse,
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { RegisterDto, RegisterSchema } from './dto/register.dto.js';
-import { LoginDto, LoginSchema } from './dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { LoginDto } from './dto/login.dto.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { ApiResponse } from '../../common/types/api-response.js';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiBody({ type: RegisterDto })
+  @SwaggerApiResponse({
+    status: 201,
+    description: 'User registered successfully',
+  })
+  @SwaggerApiResponse({ status: 400, description: 'Validation failed' })
+  @SwaggerApiResponse({ status: 409, description: 'Email already registered' })
   register(
-    @Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto,
+    @Body(new ZodValidationPipe(RegisterDto.schema)) dto: RegisterDto,
   ): ApiResponse {
     return new ApiResponse('User registered successfully', {
       user: { id: '1', email: dto.email, name: dto.name },
@@ -31,8 +48,13 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({ type: LoginDto })
+  @SwaggerApiResponse({ status: 200, description: 'Login successful' })
+  @SwaggerApiResponse({ status: 400, description: 'Validation failed' })
+  @SwaggerApiResponse({ status: 401, description: 'Invalid email or password' })
   login(
-    @Body(new ZodValidationPipe(LoginSchema)) dto: LoginDto,
+    @Body(new ZodValidationPipe(LoginDto.schema)) dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): ApiResponse {
     res.cookie('refresh_token', 'stub-refresh-token', {
@@ -51,6 +73,16 @@ export class AuthController {
 
   @Post('rotate')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rotate refresh token' })
+  @ApiCookieAuth()
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'Token rotated successfully',
+  })
+  @SwaggerApiResponse({
+    status: 401,
+    description: 'Invalid/revoked/expired refresh token',
+  })
   rotate(@Req() req: Request): ApiResponse {
     void req;
     return new ApiResponse('Token rotated successfully', {
@@ -60,6 +92,9 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout and revoke refresh token' })
+  @ApiCookieAuth()
+  @SwaggerApiResponse({ status: 200, description: 'Logged out successfully' })
   logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -71,6 +106,13 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'User retrieved successfully',
+  })
+  @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser('id') userId: string): ApiResponse {
     return new ApiResponse('User retrieved successfully', {
       user: { id: userId, email: 'stub@test.com', name: 'Stub User' },

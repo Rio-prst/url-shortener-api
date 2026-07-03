@@ -1,40 +1,74 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { IUrlsService, UrlResponse } from './interfaces/urls.service.interface';
 import { CreateUrlDto } from './dto/create-url.dto';
+import { IUrlsRepository } from './interfaces/urls.repository.interface';
+import { randomBytes } from 'node:crypto';
+import { ICacheService } from '../cache/interfaces/cache.service.interface';
 
-// TODO: implement with slug generation + repository calls
 @Injectable()
 export class UrlsService implements IUrlsService {
-  createUrl(dto: CreateUrlDto, userId?: string): Promise<UrlResponse> {
-    void dto;
-    void userId;
-    return Promise.resolve({
-      id: '',
-      slug: '',
-      originalUrl: '',
-      userId: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
+  constructor(
+    @Inject(IUrlsRepository) private readonly urlsRepository: IUrlsRepository,
+    @Inject(ICacheService) private readonly cacheService: ICacheService,
+  ) {}
+
+  async createUrl(dto: CreateUrlDto, userId?: string): Promise<UrlResponse> {
+    const slug = dto.slug ?? this.generateSlug();
+
+    const exists = await this.urlsRepository.slugExists(slug);
+    if (exists) {
+      throw new ConflictException('Slug already exists');
+    }
+
+    return this.urlsRepository.createUrl({
+      slug,
+      originalUrl: dto.url,
+      userId,
     });
   }
 
-  findBySlug(slug: string): Promise<UrlResponse | null> {
-    void slug;
-    return Promise.resolve(null);
+  async findBySlug(slug: string): Promise<UrlResponse | null> {
+    const cacheKey = `url:slug:${slug}`;
+    const cached = await this.cacheService.get<UrlResponse>(cacheKey);
+    if (cached) return cached;
+    const url = await this.urlsRepository.findBySlug(slug);
+
+    if (url) {
+      await this.cacheService.set(cacheKey, url, 3600);
+    }
+
+    return url;
   }
 
-  findById(id: string): Promise<UrlResponse | null> {
-    void id;
-    return Promise.resolve(null);
+  async findById(id: string): Promise<UrlResponse | null> {
+    return this.urlsRepository.findById(id);
   }
 
-  deleteUrl(id: string, userId: string): Promise<void> {
-    void id;
-    void userId;
-    return Promise.resolve();
+  async deleteUrl(id: string, userId: string): Promise<void> {
+    const url = await this.urlsRepository.findById(id);
+
+    if (!url) {
+      throw new NotFoundException('URL not found');
+    }
+
+    if (url.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own URLs');
+    }
+
+    await this.urlsRepository.deleteUrl(id);
+    await this.cacheService.del(`url:slug:${url.slug}`);
   }
 
   generateSlug(): string {
-    return '';
+    return randomBytes(6)
+      .toString('base64url')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 7);
   }
 }
