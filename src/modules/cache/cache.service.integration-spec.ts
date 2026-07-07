@@ -9,6 +9,11 @@ describe('CacheService', () => {
   beforeAll(async () => {
     redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
 
+    await new Promise<void>((resolve, reject) => {
+      redis.once('ready', resolve);
+      redis.once('error', reject);
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {

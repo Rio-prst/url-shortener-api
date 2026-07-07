@@ -23,7 +23,10 @@ export class UrlsService implements IUrlsService {
 
     const exists = await this.urlsRepository.slugExists(slug);
     if (exists) {
-      throw new ConflictException('Slug already exists');
+      throw new ConflictException({
+        code: 'urls.slug.exists',
+        message: 'Slug already exists',
+      });
     }
 
     return this.urlsRepository.createUrl({
@@ -58,7 +61,10 @@ export class UrlsService implements IUrlsService {
     }
 
     if (url.userId !== userId) {
-      throw new ForbiddenException('You can only delete your own URLs');
+      throw new ForbiddenException({
+        code: 'urls.forbidden',
+        message: 'You do not own this URL',
+      });
     }
 
     await this.urlsRepository.deleteUrl(id);

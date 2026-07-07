@@ -11,8 +11,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Inject,
+  NotFoundException,
 } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -21,12 +22,13 @@ import {
   ApiQuery,
   ApiBody,
 } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { CreateUrlDto } from './dto/create-url.dto.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { ApiResponse } from '../../common/types/api-response.js';
+import { IUrlsService } from './interfaces/urls.service.interface.js';
 import { IAnalyticsService } from '../analytics/interfaces/analytics.service.interface.js';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -35,6 +37,7 @@ import { Queue } from 'bullmq';
 @Controller()
 export class UrlsController {
   constructor(
+    @Inject(IUrlsService) private readonly urlsService: IUrlsService,
     @Inject(IAnalyticsService)
     private readonly analyticsService: IAnalyticsService,
     @InjectQueue('click-events')
@@ -43,6 +46,7 @@ export class UrlsController {
 
   @Post('shorten')
   @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a shortened URL' })
   @ApiBody({ type: CreateUrlDto })
@@ -53,20 +57,12 @@ export class UrlsController {
   @SwaggerApiResponse({ status: 400, description: 'Validation failed' })
   @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   @SwaggerApiResponse({ status: 409, description: 'Slug already exists' })
-  createUrl(
+  async createUrl(
     @Body(new ZodValidationPipe(CreateUrlDto.schema)) dto: CreateUrlDto,
     @CurrentUser('id') userId: string,
-  ): ApiResponse {
-    return new ApiResponse('URL shortened successfully', {
-      url: {
-        id: '1',
-        slug: 'stub123',
-        originalUrl: dto.url,
-        userId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
+  ): Promise<ApiResponse> {
+    const url = await this.urlsService.createUrl(dto, userId);
+    return new ApiResponse('URL shortened successfully', { url });
   }
 
   @Get(':slug')
@@ -78,14 +74,24 @@ export class UrlsController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ): Promise<void> {
+    const url = await this.urlsService.findBySlug(slug);
+
+    if (!url) {
+      throw new NotFoundException({
+        code: 'urls.not_found',
+        message: 'URL not found',
+      });
+    }
+
     const referrer = req.headers.referer;
     const userAgent = req.headers['user-agent'];
     await this.clickQueue.add('record-click', {
-      urlId: 'stub-id',
+      urlId: url.id,
       referrer: typeof referrer === 'string' ? referrer : undefined,
       userAgent: typeof userAgent === 'string' ? userAgent : undefined,
     });
-    return res.redirect(302, `https://example.com/${slug}`);
+
+    return res.redirect(302, url.originalUrl);
   }
 
   @Get('urls/:id/stats')
@@ -123,12 +129,11 @@ export class UrlsController {
   @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   @SwaggerApiResponse({ status: 403, description: 'You do not own this URL' })
   @SwaggerApiResponse({ status: 404, description: 'URL not found' })
-  deleteUrl(
+  async deleteUrl(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-  ): ApiResponse {
-    void id;
-    void userId;
+  ): Promise<ApiResponse> {
+    await this.urlsService.deleteUrl(id, userId);
     return new ApiResponse('URL deleted successfully');
   }
 }

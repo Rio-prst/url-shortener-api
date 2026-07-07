@@ -28,7 +28,7 @@ export class AuthService implements IAuthService {
     const existing = await this.authRepository.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException({
-        code: 'auth.email.exists',
+        code: 'auth.user.exists',
         message: 'Email already registered',
       });
     }
@@ -49,7 +49,7 @@ export class AuthService implements IAuthService {
     const record = await this.authRepository.findPasswordByEmail(dto.email);
     if (!record) {
       throw new UnauthorizedException({
-        code: 'auth.invalid.credentials',
+        code: 'auth.credentials.invalid',
         message: 'Invalid email or password',
       });
     }
@@ -57,7 +57,7 @@ export class AuthService implements IAuthService {
     const isValid = await bcrypt.compare(dto.password, record.passwordHash);
     if (!isValid) {
       throw new UnauthorizedException({
-        code: 'auth.invalid.credentials',
+        code: 'auth.credentials.invalid',
         message: 'Invalid email or password',
       });
     }
@@ -90,19 +90,19 @@ export class AuthService implements IAuthService {
     const stored = await this.authRepository.findRefreshToken(refreshToken);
     if (!stored) {
       throw new UnauthorizedException({
-        code: 'auth.invalid.token',
+        code: 'auth.refresh.invalid',
         message: 'Invalid refresh token',
       });
     }
     if (stored.revoked) {
       throw new UnauthorizedException({
-        code: 'auth.token.revoked',
+        code: 'auth.refresh.revoked',
         message: 'Refresh token has been revoked',
       });
     }
     if (stored.expiresAt < new Date()) {
       throw new UnauthorizedException({
-        code: 'auth.token.expired',
+        code: 'auth.refresh.expired',
         message: 'Refresh token has expired',
       });
     }

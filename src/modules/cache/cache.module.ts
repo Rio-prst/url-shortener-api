@@ -8,7 +8,8 @@ import { ICacheService } from './interfaces/cache.service.interface';
   providers: [
     {
       provide: Redis,
-      useFactory: () => new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379'),
+      useFactory: (): Redis =>
+        new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379'),
     },
     {
       provide: ICacheService,

@@ -1,57 +1,74 @@
+import { randomUUID } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlsRepository } from './urls.repository';
+import { AuthRepository } from '../auth/auth.repository';
+import { PrismaModule } from '../../prisma/prisma.module';
 
 describe('UrlsRepository', () => {
   let repository: UrlsRepository;
+  let authRepository: AuthRepository;
+  let seedUserId: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UrlsRepository],
+      imports: [PrismaModule],
+      providers: [UrlsRepository, AuthRepository],
     }).compile();
 
     repository = module.get(UrlsRepository);
+    authRepository = module.get(AuthRepository);
+
+    const user = await authRepository.createUser({
+      email: `urls-seed-${randomUUID()}@test.com`,
+      passwordHash: 'hashed-password',
+      name: 'URLs Seed User',
+    });
+    seedUserId = user.id;
   });
 
   describe('createUrl', () => {
     it('should create url with userId', async () => {
+      const slug = `create-with-user-${randomUUID()}`;
       const url = await repository.createUrl({
-        slug: 'create-with-user',
+        slug,
         originalUrl: 'https://example.com/1',
-        userId: '1',
+        userId: seedUserId,
       });
 
       expect(url.id).toBeDefined();
-      expect(url.slug).toBe('create-with-user');
+      expect(url.slug).toBe(slug);
       expect(url.originalUrl).toBe('https://example.com/1');
-      expect(url.userId).toBe('1');
+      expect(url.userId).toBe(seedUserId);
       expect(url.createdAt).toBeInstanceOf(Date);
       expect(url.updatedAt).toBeInstanceOf(Date);
     });
 
     it('should create url without userId', async () => {
+      const slug = `create-no-user-${randomUUID()}`;
       const url = await repository.createUrl({
-        slug: 'create-no-user',
+        slug,
         originalUrl: 'https://example.com/2',
       });
 
       expect(url.id).toBeDefined();
-      expect(url.slug).toBe('create-no-user');
+      expect(url.slug).toBe(slug);
       expect(url.userId).toBeNull();
     });
   });
 
   describe('findBySlug', () => {
     it('should return url by slug', async () => {
+      const slug = `find-by-slug-${randomUUID()}`;
       await repository.createUrl({
-        slug: 'find-by-slug',
+        slug,
         originalUrl: 'https://example.com/find',
-        userId: '1',
+        userId: seedUserId,
       });
 
-      const url = await repository.findBySlug('find-by-slug');
+      const url = await repository.findBySlug(slug);
 
       expect(url).not.toBeNull();
-      expect(url!.slug).toBe('find-by-slug');
+      expect(url!.slug).toBe(slug);
       expect(url!.originalUrl).toBe('https://example.com/find');
     });
 
@@ -63,17 +80,18 @@ describe('UrlsRepository', () => {
 
   describe('findById', () => {
     it('should return url by id', async () => {
+      const slug = `find-by-id-${randomUUID()}`;
       const created = await repository.createUrl({
-        slug: 'find-by-id',
+        slug,
         originalUrl: 'https://example.com/id',
-        userId: '1',
+        userId: seedUserId,
       });
 
       const url = await repository.findById(created.id);
 
       expect(url).not.toBeNull();
       expect(url!.id).toBe(created.id);
-      expect(url!.slug).toBe('find-by-id');
+      expect(url!.slug).toBe(slug);
     });
 
     it('should return null for non-existent id', async () => {
@@ -84,13 +102,14 @@ describe('UrlsRepository', () => {
 
   describe('slugExists', () => {
     it('should return true for existing slug', async () => {
+      const slug = `slug-exists-${randomUUID()}`;
       await repository.createUrl({
-        slug: 'slug-exists',
+        slug,
         originalUrl: 'https://example.com/exists',
-        userId: '1',
+        userId: seedUserId,
       });
 
-      const exists = await repository.slugExists('slug-exists');
+      const exists = await repository.slugExists(slug);
       expect(exists).toBe(true);
     });
 
@@ -102,10 +121,11 @@ describe('UrlsRepository', () => {
 
   describe('deleteUrl', () => {
     it('should delete url by id', async () => {
+      const slug = `delete-me-${randomUUID()}`;
       const created = await repository.createUrl({
-        slug: 'delete-me',
+        slug,
         originalUrl: 'https://example.com/delete',
-        userId: '1',
+        userId: seedUserId,
       });
 
       await repository.deleteUrl(created.id);

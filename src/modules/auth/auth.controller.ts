@@ -8,6 +8,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Inject,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,18 +19,24 @@ import {
   ApiCookieAuth,
   ApiBody,
 } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { ApiResponse } from '../../common/types/api-response.js';
+import { IAuthService } from './interfaces/auth.service.interface.js';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  constructor(
+    @Inject(IAuthService) private readonly authService: IAuthService,
+  ) {}
+
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @SwaggerApiResponse({
@@ -37,12 +45,13 @@ export class AuthController {
   })
   @SwaggerApiResponse({ status: 400, description: 'Validation failed' })
   @SwaggerApiResponse({ status: 409, description: 'Email already registered' })
-  register(
+  async register(
     @Body(new ZodValidationPipe(RegisterDto.schema)) dto: RegisterDto,
-  ): ApiResponse {
+  ): Promise<ApiResponse> {
+    const { user, tokens } = await this.authService.register(dto);
     return new ApiResponse('User registered successfully', {
-      user: { id: '1', email: dto.email, name: dto.name },
-      accessToken: 'stub-access-token',
+      user,
+      accessToken: tokens.accessToken,
     });
   }
 
@@ -53,11 +62,13 @@ export class AuthController {
   @SwaggerApiResponse({ status: 200, description: 'Login successful' })
   @SwaggerApiResponse({ status: 400, description: 'Validation failed' })
   @SwaggerApiResponse({ status: 401, description: 'Invalid email or password' })
-  login(
+  async login(
     @Body(new ZodValidationPipe(LoginDto.schema)) dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): ApiResponse {
-    res.cookie('refresh_token', 'stub-refresh-token', {
+  ): Promise<ApiResponse> {
+    const { user, tokens } = await this.authService.login(dto);
+
+    res.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: false,
@@ -66,8 +77,8 @@ export class AuthController {
     });
 
     return new ApiResponse('Login successful', {
-      user: { id: '1', email: dto.email, name: 'Stub User' },
-      accessToken: 'stub-access-token',
+      user,
+      accessToken: tokens.accessToken,
     });
   }
 
@@ -83,10 +94,30 @@ export class AuthController {
     status: 401,
     description: 'Invalid/revoked/expired refresh token',
   })
-  rotate(@Req() req: Request): ApiResponse {
-    void req;
+  async rotate(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ApiResponse> {
+    const refreshToken: string | undefined = req.cookies?.refresh_token;
+    if (!refreshToken) {
+      throw new UnauthorizedException({
+        code: 'auth.refresh.invalid',
+        message: 'Invalid refresh token',
+      });
+    }
+    const tokens = await this.authService.rotate(refreshToken);
+
+    res.cookie('refresh_token', tokens.refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return new ApiResponse('Token rotated successfully', {
-      accessToken: 'stub-new-access-token',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     });
   }
 
@@ -95,11 +126,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout and revoke refresh token' })
   @ApiCookieAuth()
   @SwaggerApiResponse({ status: 200, description: 'Logged out successfully' })
-  logout(
+  async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): ApiResponse {
-    void req;
+  ): Promise<ApiResponse> {
+    const refreshToken = req.cookies?.refresh_token;
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
     res.clearCookie('refresh_token', { path: '/' });
     return new ApiResponse('Logged out successfully');
   }
@@ -113,9 +147,8 @@ export class AuthController {
     description: 'User retrieved successfully',
   })
   @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
-  me(@CurrentUser('id') userId: string): ApiResponse {
-    return new ApiResponse('User retrieved successfully', {
-      user: { id: userId, email: 'stub@test.com', name: 'Stub User' },
-    });
+  async me(@CurrentUser('id') userId: string): Promise<ApiResponse> {
+    const user = await this.authService.me(userId);
+    return new ApiResponse('User retrieved successfully', { user });
   }
 }

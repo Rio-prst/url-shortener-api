@@ -1,10 +1,13 @@
+import { randomUUID } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
+  const testEmail = `auth-${randomUUID()}@test.com`;
+  const testPassword = 'password123';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -12,7 +15,6 @@ describe('Auth (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
     await app.init();
   });
 
@@ -25,14 +27,14 @@ describe('Auth (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
         .send({
-          email: 'test@test.com',
-          password: 'password123',
+          email: testEmail,
+          password: testPassword,
           name: 'Test User',
         })
         .expect(201)
         .expect((res) => {
           expect(res.body.message).toBe('User registered successfully');
-          expect(res.body.data.user.email).toBe('test@test.com');
+          expect(res.body.data.user.email).toBe(testEmail);
           expect(res.body.data.accessToken).toBeDefined();
         });
     });
@@ -41,8 +43,8 @@ describe('Auth (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
         .send({
-          email: 'test@test.com',
-          password: 'password123',
+          email: testEmail,
+          password: testPassword,
           name: 'Test User',
         })
         .expect(409);
@@ -53,7 +55,7 @@ describe('Auth (e2e)', () => {
         .post('/auth/register')
         .send({
           email: 'invalid-email',
-          password: 'password123',
+          password: testPassword,
           name: 'Test User',
         })
         .expect(400);
@@ -63,7 +65,7 @@ describe('Auth (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
         .send({
-          email: 'test2@test.com',
+          email: `weak-${randomUUID()}@test.com`,
           password: '123',
           name: 'Test User',
         })
@@ -83,8 +85,8 @@ describe('Auth (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
         .send({
-          email: 'test@test.com',
-          password: 'password123',
+          email: testEmail,
+          password: testPassword,
         })
         .expect(200)
         .expect((res) => {
@@ -97,7 +99,7 @@ describe('Auth (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
         .send({
-          email: 'test@test.com',
+          email: testEmail,
           password: 'wrongpassword',
         })
         .expect(401);
@@ -108,7 +110,7 @@ describe('Auth (e2e)', () => {
         .post('/auth/login')
         .send({
           email: 'nonexistent@test.com',
-          password: 'password123',
+          password: testPassword,
         })
         .expect(401);
     });
@@ -119,8 +121,8 @@ describe('Auth (e2e)', () => {
 
     beforeAll(async () => {
       const res = await request(app.getHttpServer()).post('/auth/login').send({
-        email: 'test@test.com',
-        password: 'password123',
+        email: testEmail,
+        password: testPassword,
       });
       accessToken = res.body.data.accessToken;
     });
@@ -131,7 +133,7 @@ describe('Auth (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body.data.user.email).toBe('test@test.com');
+          expect(res.body.data.user.email).toBe(testEmail);
         });
     });
 

@@ -1,24 +1,37 @@
+import { randomUUID } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsRepository } from './analytics.repository';
 import { UrlsRepository } from '../urls/urls.repository';
+import { AuthRepository } from '../auth/auth.repository';
+import { PrismaModule } from '../../prisma/prisma.module';
 
 describe('AnalyticsRepository', () => {
   let repository: AnalyticsRepository;
   let urlsRepository: UrlsRepository;
+  let authRepository: AuthRepository;
   let urlId: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AnalyticsRepository, UrlsRepository],
+      imports: [PrismaModule],
+      providers: [AnalyticsRepository, UrlsRepository, AuthRepository],
     }).compile();
 
     repository = module.get(AnalyticsRepository);
     urlsRepository = module.get(UrlsRepository);
+    authRepository = module.get(AuthRepository);
 
+    const user = await authRepository.createUser({
+      email: `analytics-seed-${randomUUID()}@test.com`,
+      passwordHash: 'hashed-password',
+      name: 'Analytics Seed User',
+    });
+
+    const slug = `analytics-test-${randomUUID()}`;
     const url = await urlsRepository.createUrl({
-      slug: 'analytics-test',
+      slug,
       originalUrl: 'https://example.com/analytics',
-      userId: '1',
+      userId: user.id,
     });
     urlId = url.id;
   });
@@ -54,10 +67,10 @@ describe('AnalyticsRepository', () => {
     });
 
     it('should return 0 for url with no clicks', async () => {
+      const slug = `no-clicks-${randomUUID()}`;
       const newUrl = await urlsRepository.createUrl({
-        slug: 'no-clicks',
+        slug,
         originalUrl: 'https://example.com/noclicks',
-        userId: '1',
       });
 
       const total = await repository.getTotalClicks(newUrl.id);

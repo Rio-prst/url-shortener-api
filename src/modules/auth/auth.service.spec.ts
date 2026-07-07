@@ -3,6 +3,7 @@ import { mock } from 'jest-mock-extended';
 import { AuthService } from './auth.service';
 import { IAuthRepository } from './interfaces/auth.repository.interface';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -72,12 +73,10 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should login with valid credentials', async () => {
-      const bcrypt = await import('bcrypt');
-      const hashedPassword = await bcrypt.hash('password123', 10);
-
+      const passwordHash = await bcrypt.hash('password123', 10);
       mockRepository.findPasswordByEmail.mockResolvedValue({
         id: '1',
-        passwordHash: hashedPassword,
+        passwordHash,
       });
       mockRepository.findById.mockResolvedValue({
         id: '1',
@@ -114,12 +113,10 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
-      const bcrypt = await import('bcrypt');
-      const hashedPassword = await bcrypt.hash('correct', 10);
-
+      const passwordHash = await bcrypt.hash('correct', 10);
       mockRepository.findPasswordByEmail.mockResolvedValue({
         id: '1',
-        passwordHash: hashedPassword,
+        passwordHash,
       });
 
       await expect(

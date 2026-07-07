@@ -18,7 +18,6 @@ import {
 } from '../../generated/prisma/sql';
 import { PrismaService } from '../../prisma/prisma.service';
 
-// TODO: implement with Prisma TypedSQL
 @Injectable()
 export class AuthRepository implements IAuthRepository {
   constructor(private readonly prisma: PrismaService) {}

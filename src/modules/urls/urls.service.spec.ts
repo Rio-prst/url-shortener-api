@@ -7,16 +7,19 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { ICacheService } from '../cache/interfaces/cache.service.interface';
 
 describe('UrlsService', () => {
   let service: UrlsService;
   const mockRepository = mock<IUrlsRepository>();
+  const mockCacheService = mock<ICacheService>();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UrlsService,
         { provide: IUrlsRepository, useValue: mockRepository },
+        { provide: ICacheService, useValue: mockCacheService },
       ],
     }).compile();
 
