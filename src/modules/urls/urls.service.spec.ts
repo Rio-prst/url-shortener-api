@@ -65,11 +65,18 @@ describe('UrlsService', () => {
     });
 
     it('should throw ConflictException for duplicate slug', async () => {
-      mockRepository.slugExists.mockResolvedValue(true);
+      const dbError = { code: '23505' };
+      mockRepository.createUrl.mockRejectedValue(dbError);
 
       await expect(
         service.createUrl({ url: 'https://example.com', slug: 'taken' }),
       ).rejects.toThrow(ConflictException);
+
+      expect(mockRepository.createUrl).toHaveBeenCalledWith({
+        originalUrl: 'https://example.com',
+        slug: 'taken',
+        userId: undefined,
+      });
     });
   });
 

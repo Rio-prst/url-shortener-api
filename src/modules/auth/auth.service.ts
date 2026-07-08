@@ -18,9 +18,17 @@ import { IAuthRepository } from './interfaces/auth.repository.interface';
 
 @Injectable()
 export class AuthService implements IAuthService {
+  private readonly jwtSecret: string;
+
   constructor(
     @Inject(IAuthRepository) private readonly authRepository: IAuthRepository,
-  ) {}
+  ) {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    this.jwtSecret = jwtSecret;
+  }
 
   async register(
     dto: RegisterDto,
@@ -70,6 +78,7 @@ export class AuthService implements IAuthService {
       });
     }
 
+    await this.authRepository.revokeAllRefreshTokens(user.id);
     const tokens = await this.generateTokens(user.id, user.email);
 
     return { user, tokens };
@@ -128,11 +137,9 @@ export class AuthService implements IAuthService {
     userId: string,
     email: string,
   ): Promise<AuthTokens> {
-    const accessToken = jwt.sign(
-      { sub: userId, email },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '15m' },
-    );
+    const accessToken = jwt.sign({ sub: userId, email }, this.jwtSecret, {
+      expiresIn: '15m',
+    });
 
     const refreshTokenValue = crypto.randomUUID();
     const expiresAt = new Date();

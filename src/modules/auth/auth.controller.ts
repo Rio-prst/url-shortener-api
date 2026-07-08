@@ -71,7 +71,7 @@ export class AuthController {
     res.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -110,14 +110,13 @@ export class AuthController {
     res.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return new ApiResponse('Token rotated successfully', {
       accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
     });
   }
 

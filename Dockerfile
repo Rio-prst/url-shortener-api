@@ -1,6 +1,6 @@
 FROM node:22-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pnpm run build
 
 FROM node:22-alpine
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ COPY pnpm-lock.yaml package.json ./
 RUN pnpm install --prod --frozen-lockfile
 
 COPY prisma ./prisma
-RUN pnpm prisma generate
+RUN pnpm prisma generate --sql
 
 COPY --from=builder /app/dist ./dist
 

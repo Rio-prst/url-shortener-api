@@ -18,22 +18,66 @@ export class UrlsService implements IUrlsService {
     @Inject(ICacheService) private readonly cacheService: ICacheService,
   ) {}
 
+  private isUniqueConstraintError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    if ('code' in error) {
+      if (error.code === '23505' || error.code === 'P2002') {
+        return true;
+      }
+
+      if (error.code === 'P2010' && 'meta' in error) {
+        const meta = error.meta;
+
+        if (
+          typeof meta === 'object' &&
+          meta !== null &&
+          'driverAdapterError' in meta
+        ) {
+          const driverAdapterError = meta.driverAdapterError;
+
+          if (
+            typeof driverAdapterError === 'object' &&
+            driverAdapterError !== null &&
+            'cause' in driverAdapterError
+          ) {
+            const cause = driverAdapterError.cause;
+
+            if (
+              typeof cause === 'object' &&
+              cause !== null &&
+              'originalCode' in cause
+            ) {
+              return cause.originalCode === '23505';
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   async createUrl(dto: CreateUrlDto, userId?: string): Promise<UrlResponse> {
     const slug = dto.slug ?? this.generateSlug();
 
-    const exists = await this.urlsRepository.slugExists(slug);
-    if (exists) {
-      throw new ConflictException({
-        code: 'urls.slug.exists',
-        message: 'Slug already exists',
+    try {
+      return await this.urlsRepository.createUrl({
+        slug,
+        originalUrl: dto.url,
+        userId,
       });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException({
+          code: 'urls.slug.exists',
+          message: 'Slug already exists',
+        });
+      }
+      throw error;
     }
-
-    return this.urlsRepository.createUrl({
-      slug,
-      originalUrl: dto.url,
-      userId,
-    });
   }
 
   async findBySlug(slug: string): Promise<UrlResponse | null> {

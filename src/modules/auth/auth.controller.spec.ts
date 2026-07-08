@@ -88,7 +88,6 @@ describe('AuthController', () => {
       expect(result.message).toBe('Token rotated successfully');
       expect(result.data).toEqual({
         accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
       });
       expect(mockAuthService.rotate).toHaveBeenCalledWith('old-token');
     });

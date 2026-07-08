@@ -8,8 +8,8 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/urlshortener_dev
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-secret-key
-      JWT_REFRESH_SECRET: your-refresh-secret-key
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       PORT: 3000
     depends_on:
       postgres:

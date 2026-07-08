@@ -32,6 +32,7 @@ import { IUrlsService } from './interfaces/urls.service.interface.js';
 import { IAnalyticsService } from '../analytics/interfaces/analytics.service.interface.js';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ForbiddenException } from '@nestjs/common';
 
 @ApiTags('URLs')
 @Controller()
@@ -111,9 +112,25 @@ export class UrlsController {
   @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   async getStats(
     @Param('id') id: string,
+    @CurrentUser('id') userId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ): Promise<ApiResponse> {
+    const url = await this.urlsService.findById(id);
+
+    if (!url) {
+      throw new NotFoundException({
+        code: 'urls.not_found',
+        message: 'URL not found',
+      });
+    }
+
+    if (url.userId !== userId) {
+      throw new ForbiddenException({
+        code: 'urls.forbidden',
+        message: 'You do not own this URL',
+      });
+    }
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     const stats = await this.analyticsService.getStats(id, fromDate, toDate);
