@@ -9,6 +9,10 @@ describe('AuthService', () => {
   let service: AuthService;
   const mockRepository = mock<IAuthRepository>();
 
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
